@@ -20,18 +20,39 @@ This is a protocol and operator stack, not a chartered bank. It covers six areas
 | Path | What |
 |---|---|
 | `docs/` | Landscape, architecture, threat model, specs, ADRs |
-| `contracts/` | Solidity (Foundry): accounts, policy engine, instruments |
-| `services/` | Go: ledger, payment orchestrator, indexer, reconciliation |
+| `contracts/` | Solidity (Foundry): policy engine, agent accounts, account factory, escrow, testnet faucet |
+| `services/` | Go: double-entry ledger, payment orchestrator, chain indexer, relayer, REST API (`bankd`) |
+| `sdk/` | TypeScript SDK and MCP server for agents |
+| `scripts/` | `e2e.sh` (full local run on anvil), `gen-abi.sh` |
 
 Start with [`docs/01-architecture.md`](docs/01-architecture.md).
+
+## Run it
+
+```bash
+cd contracts && forge install foundry-rs/forge-std && forge test   # 48 tests: unit, fuzz, invariant
+cd services && go test -race ./...                                  # incl. integration on a simulated chain
+cd sdk && npm install && npm test
+./scripts/e2e.sh   # anvil -> deploy -> bankd -> agent pays, gets blocked, gets co-signed -> MCP tools
+```
+
+What the end-to-end run shows:
+
+1. An org owner opens an account at a predicted address and funds it from the faucet.
+2. The owner sets an org → agent policy tree and gives the agent a session key.
+3. The agent pays a merchant through the API. Funds are held, the policy is dry-run, the intent is relayed and indexed, and the payment is settled and reconciled.
+4. A prompt-injected "drain" is rejected before anything is signed on-chain.
+5. A payment over the co-sign threshold waits for the owner's signature, then settles.
+6. The ledger matches the on-chain balance exactly.
+7. An LLM-facing MCP client pays by payee name. Raw addresses and over-limit amounts are refused.
 
 ## Status
 
 | Phase | Scope | State |
 |---|---|---|
 | P0 | Design docs | done |
-| P1 | Accounts + on-chain policy core, SDK/MCP, x402 pay | in progress |
-| P2 | Orchestrator, ledger, indexer, reconciliation, treasury | in progress (ledger + state machine) |
+| P1 | Accounts + on-chain policy core (payments, batch payouts, venue calls), factory, escrow, SDK/MCP | done (x402 rail pending) |
+| P2 | Orchestrator, ledger, indexer, relayer, API, reconciliation | done (treasury sweep, screening adapter, Postgres pending) |
 | P3 | Fintech rails, trade finance | planned |
 | P4 | Convert + cross-chain | planned |
 | P5 | Credit, factoring, tranched pool | planned |

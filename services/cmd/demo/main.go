@@ -5,6 +5,8 @@
 //
 //	DEMO_RPC_URL, DEMO_BANK_URL, DEMO_OWNER_KEY, DEMO_FUNDER_KEY,
 //	BANK_ENGINE, BANK_FACTORY, BANK_TOKENS (first token used), FAUCET
+//	DEMO_AGENT_KEY  optional fixed session key (default: random)
+//	DEMO_OUT        optional file to write AGENT_ACCOUNT and MERCHANT to
 package main
 
 import (
@@ -85,7 +87,12 @@ func run() error {
 	if _, d.funder, err = signer(os.Getenv("DEMO_FUNDER_KEY"), chainID); err != nil {
 		return err
 	}
-	if d.agentKey, err = crypto.GenerateKey(); err != nil {
+	if k := os.Getenv("DEMO_AGENT_KEY"); k != "" {
+		d.agentKey, err = crypto.HexToECDSA(strings.TrimPrefix(k, "0x"))
+	} else {
+		d.agentKey, err = crypto.GenerateKey()
+	}
+	if err != nil {
 		return err
 	}
 	d.engine = common.HexToAddress(os.Getenv("BANK_ENGINE"))
@@ -113,6 +120,10 @@ func run() error {
 			return fmt.Errorf("%s: %w", s.name, err)
 		}
 		fmt.Println("ok")
+	}
+	if out := os.Getenv("DEMO_OUT"); out != "" {
+		env := fmt.Sprintf("AGENT_ACCOUNT=%s\nMERCHANT=%s\n", d.account.Hex(), merchant.Hex())
+		return os.WriteFile(out, []byte(env), 0o600)
 	}
 	return nil
 }

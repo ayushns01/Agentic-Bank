@@ -13,10 +13,11 @@ PORT=${PORT:-8545}
 API=${API:-8089}
 RPC="http://127.0.0.1:$PORT"
 
-# anvil's well-known dev keys: deployer/funder, relayer, account owner.
+# anvil's well-known dev keys: deployer/funder, relayer, account owner, agent session key.
 DEPLOYER_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 RELAYER_KEY=0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d
 OWNER_KEY=0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a
+AGENT_KEY=0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6
 
 work=$(mktemp -d)
 pids=()
@@ -49,8 +50,20 @@ BANK_RPC_URL="$RPC" BANK_RELAYER_KEY="$RELAYER_KEY" BANK_CONFIRMATIONS=0 \
 pids+=($!)
 for _ in $(seq 50); do curl -sf "http://127.0.0.1:$API/healthz" >/dev/null && break; sleep 0.2; done
 
-echo "==> demo agent"
-DEMO_RPC_URL="$RPC" DEMO_BANK_URL="http://127.0.0.1:$API" \
-  DEMO_OWNER_KEY="$OWNER_KEY" DEMO_FUNDER_KEY="$DEPLOYER_KEY" "$work/demo" || {
+echo "==> demo agent (Go)"
+DEMO_RPC_URL="$RPC" DEMO_BANK_URL="http://127.0.0.1:$API" DEMO_OWNER_KEY="$OWNER_KEY" \
+  DEMO_FUNDER_KEY="$DEPLOYER_KEY" DEMO_AGENT_KEY="$AGENT_KEY" DEMO_OUT="$work/agent.env" "$work/demo" || {
   echo "--- bankd log"; cat "$work/bankd.log"; exit 1;
 }
+set -a; . "$work/agent.env"; set +a
+
+if [ -d "$root/sdk/node_modules" ]; then
+  echo "==> MCP tools (TypeScript SDK)"
+  (cd "$root/sdk" && BANK_URL="http://127.0.0.1:$API" BANK_RPC_URL="$RPC" BANK_CHAIN_ID=31337 \
+    AGENT_SESSION_KEY="$AGENT_KEY" BANK_TOKEN="$BANK_TOKENS" \
+    BANK_PAYEES="{\"cafe-merchant\": \"$MERCHANT\"}" npx tsx scripts/smoke.ts) || {
+    echo "--- bankd log"; cat "$work/bankd.log"; exit 1;
+  }
+else
+  echo "==> skipping MCP smoke (run npm install in sdk/)"
+fi

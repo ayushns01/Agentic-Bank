@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -89,7 +90,20 @@ type PolicyError struct {
 	Args []any
 }
 
-func (e *PolicyError) Error() string { return fmt.Sprintf("policy: %s%v", e.Name, e.Args) }
+func (e *PolicyError) Error() string {
+	parts := make([]string, len(e.Args))
+	for i, a := range e.Args {
+		switch v := a.(type) {
+		case [32]byte:
+			parts[i] = common.Hash(v).Hex()
+		case common.Address:
+			parts[i] = v.Hex()
+		default:
+			parts[i] = fmt.Sprint(v)
+		}
+	}
+	return fmt.Sprintf("policy: %s(%s)", e.Name, strings.Join(parts, ", "))
+}
 
 // WouldAuthorize dry-runs the on-chain policy. A nil error means the spend
 // would pass; otherwise the error is a *PolicyError when it can be decoded.
