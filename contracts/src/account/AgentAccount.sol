@@ -9,9 +9,14 @@ import {PolicyEngine} from "../policy/PolicyEngine.sol";
 /// @title AgentAccount
 /// @notice Holds an org's stablecoins and pays on behalf of its agents.
 ///
-/// Agents never hold the owner key. Each agent signs EIP-712 payment intents
-/// with a session key bound to a policy node; anyone may relay the intent.
-/// Every payment passes through PolicyEngine.authorize before funds move, so a
+/// Agents never hold the owner key. Each agent signs EIP-712 intents with a
+/// session key bound to a policy node; anyone may relay the intent. Three
+/// intent kinds exist:
+///   - PaymentIntent: one token transfer;
+///   - BatchIntent:   many transfers (payouts, payroll) under one signature;
+///   - CallIntent:    a call to an approved venue function (deposit, swap...).
+/// Every token outflow passes through PolicyEngine.authorize before funds
+/// move, and every call through PolicyEngine.authorizeCall, so a
 /// prompt-injected agent or a compromised relayer cannot exceed policy.
 /// Amounts above a node's co-sign threshold also need the owner's signature
 /// (EOA or EIP-1271 contract such as a Safe).
@@ -33,11 +38,55 @@ contract AgentAccount {
         uint64 deadline;
     }
 
+    struct Payout {
+        address token;
+        address to;
+        uint256 amount;
+        bytes32 ref;
+    }
+
+    struct BatchIntent {
+        Payout[] payouts;
+        uint256 nonce;
+        uint64 deadline;
+    }
+
+    /// @dev Who is spending under which intent; keeps internal calls shallow.
+    struct Ctx {
+        bytes32 node;
+        address key;
+        uint256 nonce;
+        bool coSigned;
+    }
+
+    struct CallIntent {
+        address target;
+        bytes data;
+        uint256 nonce;
+        uint64 deadline;
+    }
+
     bytes32 public constant PAYMENT_INTENT_TYPEHASH = keccak256(
         "PaymentIntent(address token,address to,uint256 amount,bytes32 ref,uint256 nonce,uint64 deadline)"
     );
+    bytes32 public constant PAYOUT_TYPEHASH = keccak256("Payout(address token,address to,uint256 amount,bytes32 ref)");
+    bytes32 public constant BATCH_INTENT_TYPEHASH = keccak256(
+        "BatchIntent(Payout[] payouts,uint256 nonce,uint64 deadline)Payout(address token,address to,uint256 amount,bytes32 ref)"
+    );
+    bytes32 public constant CALL_INTENT_TYPEHASH =
+        keccak256("CallIntent(address target,bytes data,uint256 nonce,uint64 deadline)");
     bytes32 private constant DOMAIN_TYPEHASH =
         keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
+
+    // ERC-20 functions that move or expose the account's tokens. A CallIntent
+    // using one of them is charged against the spend policy, not just the
+    // call allowlist.
+    bytes4 private constant TRANSFER = IERC20.transfer.selector;
+    bytes4 private constant TRANSFER_FROM = IERC20.transferFrom.selector;
+    bytes4 private constant APPROVE = IERC20.approve.selector;
+    bytes4 private constant INCREASE_ALLOWANCE = bytes4(keccak256("increaseAllowance(address,uint256)"));
+
+    uint256 public constant MAX_BATCH = 64;
 
     PolicyEngine public immutable engine;
     address public owner;
@@ -60,6 +109,9 @@ contract AgentAccount {
         uint256 nonce,
         bool coSigned
     );
+    event CallExecuted(
+        bytes32 indexed node, address indexed key, address indexed target, bytes4 selector, uint256 nonce, bool coSigned
+    );
 
     error NotOwner();
     error ZeroAddress();
@@ -71,6 +123,10 @@ contract AgentAccount {
     error InvalidCoSignature();
     error Reentrancy();
     error CallFailed(bytes reason);
+    error EmptyBatch();
+    error BatchTooLarge(uint256 size);
+    error ShortCalldata();
+    error SelfCall();
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert NotOwner();
@@ -101,19 +157,71 @@ contract AgentAccount {
         external
         nonReentrant
     {
-        bytes32 digest = intentDigest(intent);
-        (address key, bytes32 node) = _useSessionKey(digest, intent, sessionSig);
+        Ctx memory c = _begin(intentDigest(intent), intent.nonce, intent.deadline, sessionSig, ownerSig);
+        _pay(c, intent.token, intent.to, intent.amount, intent.ref);
+    }
 
-        bool coSigned;
-        if (ownerSig.length != 0) {
-            if (!SignatureChecker.isValid(owner, digest, ownerSig)) revert InvalidCoSignature();
-            coSigned = true;
+    /// @notice Execute many transfers under one signature (payouts, payroll).
+    ///         Each payout is checked and charged separately, in order; if any
+    ///         one fails the whole batch reverts.
+    function executeBatch(BatchIntent calldata intent, bytes calldata sessionSig, bytes calldata ownerSig)
+        external
+        nonReentrant
+    {
+        uint256 n = intent.payouts.length;
+        if (n == 0) revert EmptyBatch();
+        if (n > MAX_BATCH) revert BatchTooLarge(n);
+        Ctx memory c = _begin(batchDigest(intent), intent.nonce, intent.deadline, sessionSig, ownerSig);
+        for (uint256 i = 0; i < n; ++i) {
+            Payout calldata p = intent.payouts[i];
+            _pay(c, p.token, p.to, p.amount, p.ref);
         }
-        _pay(node, key, intent, coSigned);
+    }
+
+    /// @notice Call an approved venue function, e.g. deposit into a vault.
+    ///         ERC-20 transfer/approve calls are also charged against the
+    ///         node's spend limits, so a call can never move more value than
+    ///         a direct payment could. Native value is not supported here;
+    ///         budgets are denominated in the account's stablecoin units.
+    function executeCall(CallIntent calldata intent, bytes calldata sessionSig, bytes calldata ownerSig)
+        external
+        nonReentrant
+        returns (bytes memory ret)
+    {
+        if (intent.data.length < 4) revert ShortCalldata();
+        // The account administers its own policy nodes, so letting an agent
+        // call itself or the engine would let it rewrite its own limits.
+        if (intent.target == address(this) || intent.target == address(engine)) revert SelfCall();
+        Ctx memory c = _begin(callDigest(intent), intent.nonce, intent.deadline, sessionSig, ownerSig);
+
+        bytes4 selector = bytes4(intent.data[:4]);
+        engine.authorizeCall(c.node, intent.target, selector);
+        _chargeTokenCall(c, intent.target, selector, intent.data);
+
+        bool ok;
+        (ok, ret) = intent.target.call(intent.data);
+        if (!ok) revert CallFailed(ret);
+        emit CallExecuted(c.node, c.key, intent.target, selector, c.nonce, c.coSigned);
+    }
+
+    // ------------------------------------------------------------ internals
+
+    /// @dev Validates the session key (consuming its nonce) and the optional
+    ///      owner co-signature.
+    function _begin(
+        bytes32 digest,
+        uint256 nonce,
+        uint64 deadline,
+        bytes calldata sessionSig,
+        bytes calldata ownerSig
+    ) internal returns (Ctx memory c) {
+        (c.key, c.node) = _useSessionKey(digest, nonce, deadline, sessionSig);
+        c.nonce = nonce;
+        c.coSigned = _coSigned(digest, ownerSig);
     }
 
     /// @dev Recovers and validates the session key, then consumes its nonce.
-    function _useSessionKey(bytes32 digest, PaymentIntent calldata intent, bytes calldata sessionSig)
+    function _useSessionKey(bytes32 digest, uint256 nonce, uint64 deadline, bytes calldata sessionSig)
         internal
         returns (address key, bytes32 node)
     {
@@ -122,32 +230,75 @@ contract AgentAccount {
         SessionKey memory sk = sessionKeys[key];
         if (!sk.active) revert SessionKeyInactive(key);
         if (block.timestamp > sk.validUntil) revert SessionKeyExpired(key);
-        if (block.timestamp > intent.deadline) revert IntentExpired(intent.deadline);
+        if (block.timestamp > deadline) revert IntentExpired(deadline);
         uint256 expected = nonces[key];
-        if (intent.nonce != expected) revert BadNonce(expected, intent.nonce);
+        if (nonce != expected) revert BadNonce(expected, nonce);
         nonces[key] = expected + 1;
         node = sk.node;
     }
 
-    /// @dev Policy check, then transfer. Checks-effects-interactions: the
-    ///      engine records the spend before tokens move.
-    function _pay(bytes32 node, address key, PaymentIntent calldata intent, bool coSigned) internal {
-        engine.authorize(node, intent.token, intent.to, intent.amount, coSigned);
-        IERC20(intent.token).safeTransfer(intent.to, intent.amount);
-        emit PaymentExecuted(node, key, intent.token, intent.to, intent.amount, intent.ref, intent.nonce, coSigned);
+    function _coSigned(bytes32 digest, bytes calldata ownerSig) internal view returns (bool) {
+        if (ownerSig.length == 0) return false;
+        if (!SignatureChecker.isValid(owner, digest, ownerSig)) revert InvalidCoSignature();
+        return true;
     }
 
-    /// @notice EIP-712 digest of an intent for this account and chain.
+    /// @dev Policy check, then transfer. Checks-effects-interactions: the
+    ///      engine records the spend before tokens move.
+    function _pay(Ctx memory c, address token, address to, uint256 amount, bytes32 ref) internal {
+        engine.authorize(c.node, token, to, amount, c.coSigned);
+        IERC20(token).safeTransfer(to, amount);
+        emit PaymentExecuted(c.node, c.key, token, to, amount, ref, c.nonce, c.coSigned);
+    }
+
+    /// @dev Token-moving ERC-20 calls are charged like payments. Approving a
+    ///      venue charges the approved amount up front, because the venue may
+    ///      pull it later. Revoking (amount 0) is always allowed.
+    function _chargeTokenCall(Ctx memory c, address token, bytes4 selector, bytes calldata data) internal {
+        if (selector == TRANSFER || selector == APPROVE || selector == INCREASE_ALLOWANCE) {
+            (address to, uint256 amount) = abi.decode(data[4:], (address, uint256));
+            if (amount != 0) engine.authorize(c.node, token, to, amount, c.coSigned);
+        } else if (selector == TRANSFER_FROM) {
+            (address from, address to, uint256 amount) = abi.decode(data[4:], (address, address, uint256));
+            if (from == address(this) && amount != 0) engine.authorize(c.node, token, to, amount, c.coSigned);
+        }
+    }
+
+    // --------------------------------------------------------------- digests
+
+    /// @notice EIP-712 digest of a payment intent for this account and chain.
     function intentDigest(PaymentIntent calldata i) public view returns (bytes32) {
         bytes32 structHash =
             keccak256(abi.encode(PAYMENT_INTENT_TYPEHASH, i.token, i.to, i.amount, i.ref, i.nonce, i.deadline));
-        return keccak256(abi.encodePacked("\x19\x01", domainSeparator(), structHash));
+        return _hashTyped(structHash);
+    }
+
+    function batchDigest(BatchIntent calldata b) public view returns (bytes32) {
+        uint256 n = b.payouts.length;
+        bytes32[] memory hashes = new bytes32[](n);
+        for (uint256 i = 0; i < n; ++i) {
+            Payout calldata p = b.payouts[i];
+            hashes[i] = keccak256(abi.encode(PAYOUT_TYPEHASH, p.token, p.to, p.amount, p.ref));
+        }
+        bytes32 structHash =
+            keccak256(abi.encode(BATCH_INTENT_TYPEHASH, keccak256(abi.encodePacked(hashes)), b.nonce, b.deadline));
+        return _hashTyped(structHash);
+    }
+
+    function callDigest(CallIntent calldata c) public view returns (bytes32) {
+        bytes32 structHash =
+            keccak256(abi.encode(CALL_INTENT_TYPEHASH, c.target, keccak256(c.data), c.nonce, c.deadline));
+        return _hashTyped(structHash);
     }
 
     function domainSeparator() public view returns (bytes32) {
         return keccak256(
             abi.encode(DOMAIN_TYPEHASH, keccak256("AgentAccount"), keccak256("1"), block.chainid, address(this))
         );
+    }
+
+    function _hashTyped(bytes32 structHash) internal view returns (bytes32) {
+        return keccak256(abi.encodePacked("\x19\x01", domainSeparator(), structHash));
     }
 
     // --------------------------------------------------------- owner admin

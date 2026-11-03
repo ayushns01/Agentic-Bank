@@ -157,7 +157,8 @@ contract AgentAccountTest is Test {
         account.executePayment(i, sig, "");
 
         vm.warp(block.timestamp + 1 days);
-        account.executePayment(i, sig, "");
+        i = _intent(address(usdc), merchant, 1 * USD, 5); // fresh deadline after the warp
+        account.executePayment(i, _sign(agentPk, i), "");
         assertEq(engine.spentInCurrentPeriod(AGENT), 1 * USD);
     }
 

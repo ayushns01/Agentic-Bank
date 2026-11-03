@@ -37,6 +37,9 @@ contract PolicyEngine {
     mapping(bytes32 => Node) internal _nodes;
     mapping(bytes32 => mapping(address => bool)) public tokenAllowed;
     mapping(bytes32 => mapping(address => bool)) public recipientAllowed;
+    /// @notice node => target => selector => allowed. Lets an agent call
+    ///         approved functions on approved venues (deposit, swap, repay).
+    mapping(bytes32 => mapping(address => mapping(bytes4 => bool))) public callAllowed;
 
     event NodeCreated(bytes32 indexed node, address indexed account, bytes32 indexed parent);
     event LimitsUpdated(bytes32 indexed node, Limits limits);
@@ -44,6 +47,7 @@ contract PolicyEngine {
     event TokenAllowed(bytes32 indexed node, address indexed token, bool allowed);
     event RecipientAllowed(bytes32 indexed node, address indexed recipient, bool allowed);
     event Charged(bytes32 indexed node, address indexed token, address indexed to, uint256 amount);
+    event CallPermissionSet(bytes32 indexed node, address indexed target, bytes4 indexed selector, bool allowed);
 
     error NodeExists(bytes32 node);
     error UnknownNode(bytes32 node);
@@ -57,6 +61,7 @@ contract PolicyEngine {
     error PerTxLimit(bytes32 node, uint256 amount, uint256 limit);
     error PeriodLimit(bytes32 node, uint256 wouldSpend, uint256 limit);
     error CoSignRequired(bytes32 node, uint256 amount, uint256 threshold);
+    error CallNotAllowed(bytes32 node, address target, bytes4 selector);
 
     modifier onlyNodeAccount(bytes32 id) {
         Node storage n = _nodes[id];
@@ -117,7 +122,28 @@ contract PolicyEngine {
         emit RecipientAllowed(id, recipient, allowed);
     }
 
+    function setCallPermission(bytes32 id, address target, bytes4 selector, bool allowed)
+        external
+        onlyNodeAccount(id)
+    {
+        callAllowed[id][target][selector] = allowed;
+        emit CallPermissionSet(id, target, selector, allowed);
+    }
+
     // ------------------------------------------------------------- enforce
+
+    /// @notice Check that `id` and every ancestor are live and permit calling
+    ///         `selector` on `target`. Value movement is not covered here: the
+    ///         account charges token outflows through `authorize`.
+    function authorizeCall(bytes32 id, address target, bytes4 selector) external view onlyNodeAccount(id) {
+        bytes32 cur = id;
+        for (uint256 i = 0; i <= MAX_DEPTH && cur != bytes32(0); ++i) {
+            Node storage n = _nodes[cur];
+            _checkStatus(cur, n);
+            if (!callAllowed[cur][target][selector]) revert CallNotAllowed(cur, target, selector);
+            cur = n.parent;
+        }
+    }
 
     /// @notice Check a spend against `id` and every ancestor, then charge it
     ///         to all of them. Reverts with the first violated rule.
@@ -166,8 +192,7 @@ contract PolicyEngine {
         view
     {
         Limits memory l = n.limits;
-        if (n.frozen) revert NodeFrozen(id);
-        if (l.validUntil != 0 && block.timestamp > l.validUntil) revert NodeExpired(id);
+        _checkStatus(id, n);
         if (!tokenAllowed[id][token]) revert TokenNotAllowed(id, token);
         if (l.recipientAllowlist && !recipientAllowed[id][to]) revert RecipientNotAllowed(id, to);
         if (amount > l.perTxLimit) revert PerTxLimit(id, amount, l.perTxLimit);
@@ -176,6 +201,12 @@ contract PolicyEngine {
             uint256 wouldSpend = _currentSpent(n) + amount;
             if (wouldSpend > l.periodLimit) revert PeriodLimit(id, wouldSpend, l.periodLimit);
         }
+    }
+
+    function _checkStatus(bytes32 id, Node storage n) internal view {
+        if (n.frozen) revert NodeFrozen(id);
+        uint64 validUntil = n.limits.validUntil;
+        if (validUntil != 0 && block.timestamp > validUntil) revert NodeExpired(id);
     }
 
     // --------------------------------------------------------------- views
