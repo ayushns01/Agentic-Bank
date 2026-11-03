@@ -1,0 +1,949 @@
+[
+ {
+  "type": "function",
+  "name": "MAX_DEPTH",
+  "inputs": [],
+  "outputs": [
+   {
+    "name": "",
+    "type": "uint256",
+    "internalType": "uint256"
+   }
+  ],
+  "stateMutability": "view"
+ },
+ {
+  "type": "function",
+  "name": "UNLIMITED",
+  "inputs": [],
+  "outputs": [
+   {
+    "name": "",
+    "type": "uint128",
+    "internalType": "uint128"
+   }
+  ],
+  "stateMutability": "view"
+ },
+ {
+  "type": "function",
+  "name": "authorize",
+  "inputs": [
+   {
+    "name": "id",
+    "type": "bytes32",
+    "internalType": "bytes32"
+   },
+   {
+    "name": "token",
+    "type": "address",
+    "internalType": "address"
+   },
+   {
+    "name": "to",
+    "type": "address",
+    "internalType": "address"
+   },
+   {
+    "name": "amount",
+    "type": "uint256",
+    "internalType": "uint256"
+   },
+   {
+    "name": "coSigned",
+    "type": "bool",
+    "internalType": "bool"
+   }
+  ],
+  "outputs": [],
+  "stateMutability": "nonpayable"
+ },
+ {
+  "type": "function",
+  "name": "authorizeCall",
+  "inputs": [
+   {
+    "name": "id",
+    "type": "bytes32",
+    "internalType": "bytes32"
+   },
+   {
+    "name": "target",
+    "type": "address",
+    "internalType": "address"
+   },
+   {
+    "name": "selector",
+    "type": "bytes4",
+    "internalType": "bytes4"
+   }
+  ],
+  "outputs": [],
+  "stateMutability": "view"
+ },
+ {
+  "type": "function",
+  "name": "callAllowed",
+  "inputs": [
+   {
+    "name": "",
+    "type": "bytes32",
+    "internalType": "bytes32"
+   },
+   {
+    "name": "",
+    "type": "address",
+    "internalType": "address"
+   },
+   {
+    "name": "",
+    "type": "bytes4",
+    "internalType": "bytes4"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "",
+    "type": "bool",
+    "internalType": "bool"
+   }
+  ],
+  "stateMutability": "view"
+ },
+ {
+  "type": "function",
+  "name": "checkNode",
+  "inputs": [
+   {
+    "name": "id",
+    "type": "bytes32",
+    "internalType": "bytes32"
+   },
+   {
+    "name": "token",
+    "type": "address",
+    "internalType": "address"
+   },
+   {
+    "name": "to",
+    "type": "address",
+    "internalType": "address"
+   },
+   {
+    "name": "amount",
+    "type": "uint256",
+    "internalType": "uint256"
+   },
+   {
+    "name": "coSigned",
+    "type": "bool",
+    "internalType": "bool"
+   }
+  ],
+  "outputs": [],
+  "stateMutability": "view"
+ },
+ {
+  "type": "function",
+  "name": "createNode",
+  "inputs": [
+   {
+    "name": "id",
+    "type": "bytes32",
+    "internalType": "bytes32"
+   },
+   {
+    "name": "parent",
+    "type": "bytes32",
+    "internalType": "bytes32"
+   },
+   {
+    "name": "limits",
+    "type": "tuple",
+    "internalType": "struct PolicyEngine.Limits",
+    "components": [
+     {
+      "name": "perTxLimit",
+      "type": "uint128",
+      "internalType": "uint128"
+     },
+     {
+      "name": "periodLimit",
+      "type": "uint128",
+      "internalType": "uint128"
+     },
+     {
+      "name": "coSignAbove",
+      "type": "uint128",
+      "internalType": "uint128"
+     },
+     {
+      "name": "periodLength",
+      "type": "uint64",
+      "internalType": "uint64"
+     },
+     {
+      "name": "validUntil",
+      "type": "uint64",
+      "internalType": "uint64"
+     },
+     {
+      "name": "recipientAllowlist",
+      "type": "bool",
+      "internalType": "bool"
+     }
+    ]
+   }
+  ],
+  "outputs": [],
+  "stateMutability": "nonpayable"
+ },
+ {
+  "type": "function",
+  "name": "node",
+  "inputs": [
+   {
+    "name": "id",
+    "type": "bytes32",
+    "internalType": "bytes32"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "",
+    "type": "tuple",
+    "internalType": "struct PolicyEngine.Node",
+    "components": [
+     {
+      "name": "account",
+      "type": "address",
+      "internalType": "address"
+     },
+     {
+      "name": "parent",
+      "type": "bytes32",
+      "internalType": "bytes32"
+     },
+     {
+      "name": "depth",
+      "type": "uint8",
+      "internalType": "uint8"
+     },
+     {
+      "name": "frozen",
+      "type": "bool",
+      "internalType": "bool"
+     },
+     {
+      "name": "limits",
+      "type": "tuple",
+      "internalType": "struct PolicyEngine.Limits",
+      "components": [
+       {
+        "name": "perTxLimit",
+        "type": "uint128",
+        "internalType": "uint128"
+       },
+       {
+        "name": "periodLimit",
+        "type": "uint128",
+        "internalType": "uint128"
+       },
+       {
+        "name": "coSignAbove",
+        "type": "uint128",
+        "internalType": "uint128"
+       },
+       {
+        "name": "periodLength",
+        "type": "uint64",
+        "internalType": "uint64"
+       },
+       {
+        "name": "validUntil",
+        "type": "uint64",
+        "internalType": "uint64"
+       },
+       {
+        "name": "recipientAllowlist",
+        "type": "bool",
+        "internalType": "bool"
+       }
+      ]
+     },
+     {
+      "name": "periodStart",
+      "type": "uint64",
+      "internalType": "uint64"
+     },
+     {
+      "name": "spentInPeriod",
+      "type": "uint128",
+      "internalType": "uint128"
+     }
+    ]
+   }
+  ],
+  "stateMutability": "view"
+ },
+ {
+  "type": "function",
+  "name": "recipientAllowed",
+  "inputs": [
+   {
+    "name": "",
+    "type": "bytes32",
+    "internalType": "bytes32"
+   },
+   {
+    "name": "",
+    "type": "address",
+    "internalType": "address"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "",
+    "type": "bool",
+    "internalType": "bool"
+   }
+  ],
+  "stateMutability": "view"
+ },
+ {
+  "type": "function",
+  "name": "remainingInPeriod",
+  "inputs": [
+   {
+    "name": "id",
+    "type": "bytes32",
+    "internalType": "bytes32"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "",
+    "type": "uint256",
+    "internalType": "uint256"
+   }
+  ],
+  "stateMutability": "view"
+ },
+ {
+  "type": "function",
+  "name": "setCallPermission",
+  "inputs": [
+   {
+    "name": "id",
+    "type": "bytes32",
+    "internalType": "bytes32"
+   },
+   {
+    "name": "target",
+    "type": "address",
+    "internalType": "address"
+   },
+   {
+    "name": "selector",
+    "type": "bytes4",
+    "internalType": "bytes4"
+   },
+   {
+    "name": "allowed",
+    "type": "bool",
+    "internalType": "bool"
+   }
+  ],
+  "outputs": [],
+  "stateMutability": "nonpayable"
+ },
+ {
+  "type": "function",
+  "name": "setFrozen",
+  "inputs": [
+   {
+    "name": "id",
+    "type": "bytes32",
+    "internalType": "bytes32"
+   },
+   {
+    "name": "frozen",
+    "type": "bool",
+    "internalType": "bool"
+   }
+  ],
+  "outputs": [],
+  "stateMutability": "nonpayable"
+ },
+ {
+  "type": "function",
+  "name": "setLimits",
+  "inputs": [
+   {
+    "name": "id",
+    "type": "bytes32",
+    "internalType": "bytes32"
+   },
+   {
+    "name": "limits",
+    "type": "tuple",
+    "internalType": "struct PolicyEngine.Limits",
+    "components": [
+     {
+      "name": "perTxLimit",
+      "type": "uint128",
+      "internalType": "uint128"
+     },
+     {
+      "name": "periodLimit",
+      "type": "uint128",
+      "internalType": "uint128"
+     },
+     {
+      "name": "coSignAbove",
+      "type": "uint128",
+      "internalType": "uint128"
+     },
+     {
+      "name": "periodLength",
+      "type": "uint64",
+      "internalType": "uint64"
+     },
+     {
+      "name": "validUntil",
+      "type": "uint64",
+      "internalType": "uint64"
+     },
+     {
+      "name": "recipientAllowlist",
+      "type": "bool",
+      "internalType": "bool"
+     }
+    ]
+   }
+  ],
+  "outputs": [],
+  "stateMutability": "nonpayable"
+ },
+ {
+  "type": "function",
+  "name": "setRecipient",
+  "inputs": [
+   {
+    "name": "id",
+    "type": "bytes32",
+    "internalType": "bytes32"
+   },
+   {
+    "name": "recipient",
+    "type": "address",
+    "internalType": "address"
+   },
+   {
+    "name": "allowed",
+    "type": "bool",
+    "internalType": "bool"
+   }
+  ],
+  "outputs": [],
+  "stateMutability": "nonpayable"
+ },
+ {
+  "type": "function",
+  "name": "setToken",
+  "inputs": [
+   {
+    "name": "id",
+    "type": "bytes32",
+    "internalType": "bytes32"
+   },
+   {
+    "name": "token",
+    "type": "address",
+    "internalType": "address"
+   },
+   {
+    "name": "allowed",
+    "type": "bool",
+    "internalType": "bool"
+   }
+  ],
+  "outputs": [],
+  "stateMutability": "nonpayable"
+ },
+ {
+  "type": "function",
+  "name": "spentInCurrentPeriod",
+  "inputs": [
+   {
+    "name": "id",
+    "type": "bytes32",
+    "internalType": "bytes32"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "",
+    "type": "uint256",
+    "internalType": "uint256"
+   }
+  ],
+  "stateMutability": "view"
+ },
+ {
+  "type": "function",
+  "name": "tokenAllowed",
+  "inputs": [
+   {
+    "name": "",
+    "type": "bytes32",
+    "internalType": "bytes32"
+   },
+   {
+    "name": "",
+    "type": "address",
+    "internalType": "address"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "",
+    "type": "bool",
+    "internalType": "bool"
+   }
+  ],
+  "stateMutability": "view"
+ },
+ {
+  "type": "function",
+  "name": "wouldAuthorize",
+  "inputs": [
+   {
+    "name": "id",
+    "type": "bytes32",
+    "internalType": "bytes32"
+   },
+   {
+    "name": "token",
+    "type": "address",
+    "internalType": "address"
+   },
+   {
+    "name": "to",
+    "type": "address",
+    "internalType": "address"
+   },
+   {
+    "name": "amount",
+    "type": "uint256",
+    "internalType": "uint256"
+   },
+   {
+    "name": "coSigned",
+    "type": "bool",
+    "internalType": "bool"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "ok",
+    "type": "bool",
+    "internalType": "bool"
+   },
+   {
+    "name": "reason",
+    "type": "bytes",
+    "internalType": "bytes"
+   }
+  ],
+  "stateMutability": "view"
+ },
+ {
+  "type": "event",
+  "name": "CallPermissionSet",
+  "inputs": [
+   {
+    "name": "node",
+    "type": "bytes32",
+    "indexed": true,
+    "internalType": "bytes32"
+   },
+   {
+    "name": "target",
+    "type": "address",
+    "indexed": true,
+    "internalType": "address"
+   },
+   {
+    "name": "selector",
+    "type": "bytes4",
+    "indexed": true,
+    "internalType": "bytes4"
+   },
+   {
+    "name": "allowed",
+    "type": "bool",
+    "indexed": false,
+    "internalType": "bool"
+   }
+  ],
+  "anonymous": false
+ },
+ {
+  "type": "event",
+  "name": "Charged",
+  "inputs": [
+   {
+    "name": "node",
+    "type": "bytes32",
+    "indexed": true,
+    "internalType": "bytes32"
+   },
+   {
+    "name": "token",
+    "type": "address",
+    "indexed": true,
+    "internalType": "address"
+   },
+   {
+    "name": "to",
+    "type": "address",
+    "indexed": true,
+    "internalType": "address"
+   },
+   {
+    "name": "amount",
+    "type": "uint256",
+    "indexed": false,
+    "internalType": "uint256"
+   }
+  ],
+  "anonymous": false
+ },
+ {
+  "type": "event",
+  "name": "FrozenSet",
+  "inputs": [
+   {
+    "name": "node",
+    "type": "bytes32",
+    "indexed": true,
+    "internalType": "bytes32"
+   },
+   {
+    "name": "frozen",
+    "type": "bool",
+    "indexed": false,
+    "internalType": "bool"
+   }
+  ],
+  "anonymous": false
+ },
+ {
+  "type": "event",
+  "name": "LimitsUpdated",
+  "inputs": [
+   {
+    "name": "node",
+    "type": "bytes32",
+    "indexed": true,
+    "internalType": "bytes32"
+   },
+   {
+    "name": "limits",
+    "type": "tuple",
+    "indexed": false,
+    "internalType": "struct PolicyEngine.Limits",
+    "components": [
+     {
+      "name": "perTxLimit",
+      "type": "uint128",
+      "internalType": "uint128"
+     },
+     {
+      "name": "periodLimit",
+      "type": "uint128",
+      "internalType": "uint128"
+     },
+     {
+      "name": "coSignAbove",
+      "type": "uint128",
+      "internalType": "uint128"
+     },
+     {
+      "name": "periodLength",
+      "type": "uint64",
+      "internalType": "uint64"
+     },
+     {
+      "name": "validUntil",
+      "type": "uint64",
+      "internalType": "uint64"
+     },
+     {
+      "name": "recipientAllowlist",
+      "type": "bool",
+      "internalType": "bool"
+     }
+    ]
+   }
+  ],
+  "anonymous": false
+ },
+ {
+  "type": "event",
+  "name": "NodeCreated",
+  "inputs": [
+   {
+    "name": "node",
+    "type": "bytes32",
+    "indexed": true,
+    "internalType": "bytes32"
+   },
+   {
+    "name": "account",
+    "type": "address",
+    "indexed": true,
+    "internalType": "address"
+   },
+   {
+    "name": "parent",
+    "type": "bytes32",
+    "indexed": true,
+    "internalType": "bytes32"
+   }
+  ],
+  "anonymous": false
+ },
+ {
+  "type": "event",
+  "name": "RecipientAllowed",
+  "inputs": [
+   {
+    "name": "node",
+    "type": "bytes32",
+    "indexed": true,
+    "internalType": "bytes32"
+   },
+   {
+    "name": "recipient",
+    "type": "address",
+    "indexed": true,
+    "internalType": "address"
+   },
+   {
+    "name": "allowed",
+    "type": "bool",
+    "indexed": false,
+    "internalType": "bool"
+   }
+  ],
+  "anonymous": false
+ },
+ {
+  "type": "event",
+  "name": "TokenAllowed",
+  "inputs": [
+   {
+    "name": "node",
+    "type": "bytes32",
+    "indexed": true,
+    "internalType": "bytes32"
+   },
+   {
+    "name": "token",
+    "type": "address",
+    "indexed": true,
+    "internalType": "address"
+   },
+   {
+    "name": "allowed",
+    "type": "bool",
+    "indexed": false,
+    "internalType": "bool"
+   }
+  ],
+  "anonymous": false
+ },
+ {
+  "type": "error",
+  "name": "CallNotAllowed",
+  "inputs": [
+   {
+    "name": "node",
+    "type": "bytes32",
+    "internalType": "bytes32"
+   },
+   {
+    "name": "target",
+    "type": "address",
+    "internalType": "address"
+   },
+   {
+    "name": "selector",
+    "type": "bytes4",
+    "internalType": "bytes4"
+   }
+  ]
+ },
+ {
+  "type": "error",
+  "name": "CoSignRequired",
+  "inputs": [
+   {
+    "name": "node",
+    "type": "bytes32",
+    "internalType": "bytes32"
+   },
+   {
+    "name": "amount",
+    "type": "uint256",
+    "internalType": "uint256"
+   },
+   {
+    "name": "threshold",
+    "type": "uint256",
+    "internalType": "uint256"
+   }
+  ]
+ },
+ {
+  "type": "error",
+  "name": "NodeExists",
+  "inputs": [
+   {
+    "name": "node",
+    "type": "bytes32",
+    "internalType": "bytes32"
+   }
+  ]
+ },
+ {
+  "type": "error",
+  "name": "NodeExpired",
+  "inputs": [
+   {
+    "name": "node",
+    "type": "bytes32",
+    "internalType": "bytes32"
+   }
+  ]
+ },
+ {
+  "type": "error",
+  "name": "NodeFrozen",
+  "inputs": [
+   {
+    "name": "node",
+    "type": "bytes32",
+    "internalType": "bytes32"
+   }
+  ]
+ },
+ {
+  "type": "error",
+  "name": "NotNodeAccount",
+  "inputs": [
+   {
+    "name": "node",
+    "type": "bytes32",
+    "internalType": "bytes32"
+   }
+  ]
+ },
+ {
+  "type": "error",
+  "name": "PerTxLimit",
+  "inputs": [
+   {
+    "name": "node",
+    "type": "bytes32",
+    "internalType": "bytes32"
+   },
+   {
+    "name": "amount",
+    "type": "uint256",
+    "internalType": "uint256"
+   },
+   {
+    "name": "limit",
+    "type": "uint256",
+    "internalType": "uint256"
+   }
+  ]
+ },
+ {
+  "type": "error",
+  "name": "PeriodLimit",
+  "inputs": [
+   {
+    "name": "node",
+    "type": "bytes32",
+    "internalType": "bytes32"
+   },
+   {
+    "name": "wouldSpend",
+    "type": "uint256",
+    "internalType": "uint256"
+   },
+   {
+    "name": "limit",
+    "type": "uint256",
+    "internalType": "uint256"
+   }
+  ]
+ },
+ {
+  "type": "error",
+  "name": "RecipientNotAllowed",
+  "inputs": [
+   {
+    "name": "node",
+    "type": "bytes32",
+    "internalType": "bytes32"
+   },
+   {
+    "name": "to",
+    "type": "address",
+    "internalType": "address"
+   }
+  ]
+ },
+ {
+  "type": "error",
+  "name": "TokenNotAllowed",
+  "inputs": [
+   {
+    "name": "node",
+    "type": "bytes32",
+    "internalType": "bytes32"
+   },
+   {
+    "name": "token",
+    "type": "address",
+    "internalType": "address"
+   }
+  ]
+ },
+ {
+  "type": "error",
+  "name": "TooDeep",
+  "inputs": []
+ },
+ {
+  "type": "error",
+  "name": "UnknownNode",
+  "inputs": [
+   {
+    "name": "node",
+    "type": "bytes32",
+    "internalType": "bytes32"
+   }
+  ]
+ },
+ {
+  "type": "error",
+  "name": "ZeroNode",
+  "inputs": []
+ }
+]

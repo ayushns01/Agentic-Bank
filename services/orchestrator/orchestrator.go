@@ -20,6 +20,9 @@ type Payment struct {
 	Asset        string // e.g. "USDC:base"
 	Amount       *big.Int
 	Rail         string // x402, mpp, transfer, cctp...
+	// WalletAccount is the ledger asset account holding the payer's tokens
+	// on-chain. Empty means the shared wallet for Asset in Config.Wallets.
+	WalletAccount string
 
 	State   State
 	HoldID  string
@@ -128,7 +131,7 @@ func (o *Orchestrator) Submit(ctx context.Context, in Payment) (Payment, error) 
 		in.Amount == nil || in.Amount.Sign() <= 0 {
 		return Payment{}, ErrInvalidPayment
 	}
-	if _, ok := o.cfg.Wallets[in.Asset]; !ok {
+	if _, ok := o.cfg.Wallets[in.Asset]; !ok && in.WalletAccount == "" {
 		return Payment{}, fmt.Errorf("%w: unsupported asset %s", ErrInvalidPayment, in.Asset)
 	}
 
@@ -142,7 +145,7 @@ func (o *Orchestrator) Submit(ctx context.Context, in Payment) (Payment, error) 
 	}
 	p := &Payment{
 		ID: in.ID, Node: in.Node, PayerAccount: in.PayerAccount, Payee: in.Payee,
-		Asset: in.Asset, Amount: new(big.Int).Set(in.Amount), Rail: in.Rail,
+		Asset: in.Asset, Amount: new(big.Int).Set(in.Amount), Rail: in.Rail, WalletAccount: in.WalletAccount,
 		State: Created, Updated: o.cfg.Now(),
 	}
 	o.payments[p.ID] = p
@@ -254,7 +257,10 @@ func (o *Orchestrator) OnConfirmed(id, txHash string, networkFee *big.Int) (Paym
 		o.move(p, Held, fmt.Sprintf("confirmation for unexpected tx %s", txHash))
 		return clonePayment(p), nil
 	}
-	wallet := o.cfg.Wallets[p.Asset]
+	wallet := p.WalletAccount
+	if wallet == "" {
+		wallet = o.cfg.Wallets[p.Asset]
+	}
 	e := ledger.Entry{
 		ID:    "pay:" + p.ID,
 		Ref:   p.ID,
@@ -397,7 +403,8 @@ func (o *Orchestrator) move(p *Payment, to State, reason string) {
 
 func sameIntent(p, in *Payment) bool {
 	return p.Node == in.Node && p.PayerAccount == in.PayerAccount && p.Payee == in.Payee &&
-		p.Asset == in.Asset && p.Amount.Cmp(in.Amount) == 0 && p.Rail == in.Rail
+		p.Asset == in.Asset && p.Amount.Cmp(in.Amount) == 0 && p.Rail == in.Rail &&
+		p.WalletAccount == in.WalletAccount
 }
 
 func clonePayment(p *Payment) Payment {

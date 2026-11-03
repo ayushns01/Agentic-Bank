@@ -361,6 +361,31 @@ func (l *Ledger) EntriesByRef(ref string) []Entry {
 	return out
 }
 
+// EntriesForAccount returns entries with a line on account, in posting order.
+func (l *Ledger) EntriesForAccount(account string) []Entry {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	var out []Entry
+	for _, id := range l.order {
+		e := l.entries[id]
+		for _, ln := range e.Lines {
+			if ln.Account == account {
+				out = append(out, cloneEntry(e))
+				break
+			}
+		}
+	}
+	return out
+}
+
+// HasAccount reports whether an account exists.
+func (l *Ledger) HasAccount(id string) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	_, ok := l.accounts[id]
+	return ok
+}
+
 // TrialBalance returns, per asset, total debits minus total credits across
 // all accounts in raw (not normal-balance) terms. Always zero for every asset.
 func (l *Ledger) TrialBalance() map[string]*big.Int {
